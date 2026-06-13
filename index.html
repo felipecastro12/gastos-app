@@ -461,11 +461,16 @@
   <div class="modal" onclick="event.stopPropagation()">
     <div class="modal-handle"></div>
     <h2>Nueva transacción</h2>
-    <div class="confirm-tx-info">
-      <div class="confirm-amount" id="confirmAmount">—</div>
-      <div class="confirm-date" id="confirmDate">—</div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+      <div class="confirm-amount" id="confirmAmount" style="flex:1">—</div>
+      <div class="confirm-date" id="confirmDate" style="font-size:12px;color:var(--muted)">—</div>
     </div>
-    <div class="form-group" style="margin-top:16px">
+    <div class="form-group" style="margin-top:4px">
+      <label>Valor del pago</label>
+      <input type="number" id="confirmAmountInput" placeholder="Ej: 150000" inputmode="decimal"
+             oninput="document.getElementById('confirmAmount').textContent=this.value?fmt(parseFloat(this.value)||0):'—'">
+    </div>
+    <div class="form-group">
       <label>¿A qué corresponde este pago?</label>
       <input type="text" id="confirmMerchantInput" placeholder="Ej: Arriendo, Mercado Éxito, Uber..."
              autocomplete="off" style="text-transform:uppercase"
@@ -1033,10 +1038,11 @@ function openConfirmModal(tx) {
   pendingTx = tx;
   selectedCatConfirm = tx.merchant ? suggestCategory(tx.merchant) : 'varios';
   document.getElementById('confirmMerchantInput').value = tx.merchant || '';
-  document.getElementById('confirmAmount').textContent = fmt(tx.amount);
+  document.getElementById('confirmAmountInput').value = tx.amount || '';
+  document.getElementById('confirmAmount').textContent = tx.amount ? fmt(tx.amount) : '—';
   document.getElementById('confirmNote').value = tx.note || '';
   const d = new Date(tx.date + 'T00:00:00');
-  document.getElementById('confirmDate').textContent = d.toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long' });
+  document.getElementById('confirmDate').textContent = d.toLocaleDateString('es', { day:'numeric', month:'long' });
   renderCatSelector('confirmCatSelector', 'confirm');
   openModal('confirmModal');
 }
@@ -1044,8 +1050,11 @@ function openConfirmModal(tx) {
 function confirmTransaction() {
   if (!pendingTx) return;
   const concept = (document.getElementById('confirmMerchantInput').value || '').trim().toUpperCase();
+  const amount  = parseFloat(document.getElementById('confirmAmountInput').value || '0');
   if (!concept) { alert('Escribe el concepto del pago'); return; }
+  if (!amount || amount <= 0) { alert('Ingresa el valor del pago'); return; }
   pendingTx.merchant  = concept;
+  pendingTx.amount    = amount;
   pendingTx.category  = selectedCatConfirm;
   pendingTx.note      = document.getElementById('confirmNote').value || '';
   addTx(pendingTx);
