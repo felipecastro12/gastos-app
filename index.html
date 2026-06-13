@@ -1175,15 +1175,14 @@ function checkURLParams() {
   const p = new URLSearchParams(window.location.search);
   if (!p.get('add')) return;
   const merchant = (p.get('merchant') || '').toUpperCase().trim();
+  // Handles $1,000 / $100,000 / $1,000,000 (comma as thousands separator)
   const rawAmount = (p.get('amount') || '0')
-    .replace(/[^\d,\.]/g, '')   // strip $ and other symbols
-    .replace(/\./g, '')          // remove thousand-separator dots
-    .replace(',', '.');          // comma decimal → dot
+    .replace(/[^\d]/g, '');     // strip everything except digits → "1000000"
   const amount = parseFloat(rawAmount) || 0;
   const date = p.get('date') || new Date().toISOString().split('T')[0];
   const note = p.get('note') || '';
   // Show popup even if amount is 0 so user can correct it
-  setTimeout(() => openConfirmModal({ merchant: merchant || 'SIN NOMBRE', amount, date, note }), 600);
+  setTimeout(() => openConfirmModal({ merchant: '', amount, date, note }), 600);
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
