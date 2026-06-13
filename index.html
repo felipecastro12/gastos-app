@@ -462,15 +462,24 @@
     <div class="modal-handle"></div>
     <h2>Nueva transacción</h2>
     <div class="confirm-tx-info">
-      <div class="confirm-merchant" id="confirmMerchant">—</div>
       <div class="confirm-amount" id="confirmAmount">—</div>
       <div class="confirm-date" id="confirmDate">—</div>
+    </div>
+    <div class="form-group" style="margin-top:16px">
+      <label>¿A qué corresponde este pago?</label>
+      <input type="text" id="confirmMerchantInput" placeholder="Ej: Arriendo, Mercado Éxito, Uber..."
+             autocomplete="off" style="text-transform:uppercase"
+             oninput="onConfirmMerchantInput(this.value)">
+      <span id="confirmSuggestion" style="display:none" class="suggestion-badge" onclick="applyConfirmSuggestion()"></span>
     </div>
     <div class="form-group">
       <label>Categoría</label>
       <div class="cat-selector" id="confirmCatSelector"></div>
     </div>
-    <input type="hidden" id="confirmNote" value="">
+    <div class="form-group">
+      <label>Nota (opcional)</label>
+      <input type="text" id="confirmNote" placeholder="Detalles adicionales...">
+    </div>
     <br>
     <button class="btn btn-primary" onclick="confirmTransaction()">Confirmar y guardar</button>
     <button class="btn btn-outline" onclick="closeModal('confirmModal')">Cancelar</button>
@@ -901,6 +910,27 @@ function selectCat(mode, id) {
 }
 
 let suggestionCat = null;
+let confirmSuggestionCat = null;
+function onConfirmMerchantInput(val) {
+  const cat = suggestCategory(val);
+  confirmSuggestionCat = cat;
+  const badge = document.getElementById('confirmSuggestion');
+  const catObj = getCat(cat);
+  if (val.trim().length > 2 && cat !== 'varios') {
+    badge.textContent = `✨ Sugerido: ${catObj.icon} ${catObj.name}`;
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+function applyConfirmSuggestion() {
+  if (confirmSuggestionCat) {
+    selectedCatConfirm = confirmSuggestionCat;
+    renderCatSelector('confirmCatSelector', 'confirm');
+    document.getElementById('confirmSuggestion').style.display = 'none';
+    showToast('Categoría aplicada ✓');
+  }
+}
 function onMerchantInput(val) {
   const cat = suggestCategory(val);
   suggestionCat = cat;
@@ -1001,10 +1031,10 @@ function deleteTransaction() {
 
 function openConfirmModal(tx) {
   pendingTx = tx;
-  const cat = suggestCategory(tx.merchant);
-  selectedCatConfirm = cat;
-  document.getElementById('confirmMerchant').textContent = tx.merchant;
+  selectedCatConfirm = tx.merchant ? suggestCategory(tx.merchant) : 'varios';
+  document.getElementById('confirmMerchantInput').value = tx.merchant || '';
   document.getElementById('confirmAmount').textContent = fmt(tx.amount);
+  document.getElementById('confirmNote').value = tx.note || '';
   const d = new Date(tx.date + 'T00:00:00');
   document.getElementById('confirmDate').textContent = d.toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long' });
   renderCatSelector('confirmCatSelector', 'confirm');
@@ -1013,11 +1043,14 @@ function openConfirmModal(tx) {
 
 function confirmTransaction() {
   if (!pendingTx) return;
-  pendingTx.category = selectedCatConfirm;
+  const concept = (document.getElementById('confirmMerchantInput').value || '').trim().toUpperCase();
+  if (!concept) { alert('Escribe el concepto del pago'); return; }
+  pendingTx.merchant  = concept;
+  pendingTx.category  = selectedCatConfirm;
+  pendingTx.note      = document.getElementById('confirmNote').value || '';
   addTx(pendingTx);
   closeModal('confirmModal');
-  showToast('Gasto guardado ✓');
-  // Clean URL
+  showToast('Guardado ✓');
   window.history.replaceState({}, '', window.location.pathname);
   showPage('dashboard');
 }
@@ -1133,11 +1166,15 @@ function checkURLParams() {
   const p = new URLSearchParams(window.location.search);
   if (!p.get('add')) return;
   const merchant = (p.get('merchant') || '').toUpperCase().trim();
-  const amount = parseFloat(p.get('amount') || '0');
+  const rawAmount = (p.get('amount') || '0')
+    .replace(/[^\d,\.]/g, '')   // strip $ and other symbols
+    .replace(/\./g, '')          // remove thousand-separator dots
+    .replace(',', '.');          // comma decimal → dot
+  const amount = parseFloat(rawAmount) || 0;
   const date = p.get('date') || new Date().toISOString().split('T')[0];
   const note = p.get('note') || '';
-  if (!merchant || !amount) return;
-  setTimeout(() => openConfirmModal({ merchant, amount, date, note }), 300);
+  // Show popup even if amount is 0 so user can correct it
+  setTimeout(() => openConfirmModal({ merchant: merchant || 'SIN NOMBRE', amount, date, note }), 600);
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
@@ -1146,6 +1183,8 @@ initDate();
 updateMonthLabel();
 renderDashboard();
 checkURLParams();
+// Re-check when Safari restores page from cache (bfcache)
+window.addEventListener('pageshow', (e) => { if (e.persisted) checkURLParams(); });
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
