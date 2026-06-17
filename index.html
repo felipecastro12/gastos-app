@@ -594,7 +594,7 @@ function changeMonth(dir) {
 function updateMonthLabel() {
   const d = new Date(currentYear, currentMonth, 1);
   document.getElementById('monthLabel').textContent =
-    d.toLocaleDateString('es', { month: 'short', year: '2-digit' }).replace('.','').toUpperCase();
+    d.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' }).toUpperCase();
 }
 
 // ─── NAVIGATION ──────────────────────────────────────────────────────────────
@@ -684,7 +684,7 @@ function renderDashboard() {
       <div class="summary-card ingresos">
         <div class="s-label">💵 Ingresos</div>
         <div class="s-amount">${fmt(totalIngresos)}</div>
-        <div class="s-meta">${totalIngresos > 0 ? `Salario + extras` : 'Sin registrar aún'}</div>
+        <div class="s-meta">${totalIngresos > 0 ? 'Salario + extras' : 'Sin registrar aún'}</div>
       </div>
       <div class="summary-card gastos">
         <div class="s-label">💸 Gastos</div>
@@ -694,22 +694,20 @@ function renderDashboard() {
       <div class="summary-card ahorros">
         <div class="s-label">💰 Ahorros</div>
         <div class="s-amount">${fmt(totalAhorros)}</div>
-        <div class="s-meta">${pctAhorros}% del total</div>
+        <div class="s-meta">${totalIngresos>0?(totalAhorros/totalIngresos*100).toFixed(0)+'% del ingreso':'del mes'}</div>
       </div>
       <div class="summary-card inversion">
         <div class="s-label">📈 Inversión</div>
         <div class="s-amount">${fmt(totalInversion)}</div>
-        <div class="s-meta">${pctInversion}% del total</div>
+        <div class="s-meta">${totalIngresos>0?(totalInversion/totalIngresos*100).toFixed(0)+'% del ingreso':'del mes'}</div>
       </div>
     </div>
 
     <!-- BALANCE NETO -->
-    <div class="card neto" style="padding:16px 18px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+    <div class="card neto" style="padding:16px 18px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;border-color:${neto>=0?'#10b981':'#ef4444'}">
       <div>
-        <div style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px">${neto >= 0 ? '✅' : '⚠️'} Balance del mes</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:3px">
-          ${totalIngresos > 0 ? `Ingresos − Gastos − Ahorros − Inversión` : 'Ahorros + Inversión − Gastos'}
-        </div>
+        <div style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px">${neto >= 0 ? '✅' : '⚠️'} Disponible en el bolsillo</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">Ingresos − Gastos − Ahorros − Inversión</div>
       </div>
       <div style="font-size:26px;font-weight:800;color:${neto >= 0 ? 'var(--savings)' : 'var(--danger)'}">
         ${neto >= 0 ? '+' : ''}${fmt(neto)}
@@ -813,7 +811,7 @@ function renderDashboard() {
 function txHTML(t) {
   const cat = getCat(t.category);
   const d = new Date(t.date + 'T00:00:00');
-  const dateStr = d.toLocaleDateString('es', { day: '2-digit', month: 'short' });
+  const dateStr = d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
   return `
     <div class="tx-item" data-id="${t.id}">
       <div class="tx-icon" style="background:${cat.color}22">${cat.icon}</div>
@@ -835,7 +833,7 @@ function txHTML(t) {
 // ─── ADD PAGE ────────────────────────────────────────────────────────────────
 
 function renderAdd() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
   document.getElementById('page-add').innerHTML = `
     <div class="card">
       <div class="form-group">
@@ -1042,7 +1040,7 @@ function openConfirmModal(tx) {
   document.getElementById('confirmAmount').textContent = tx.amount ? fmt(tx.amount) : '—';
   document.getElementById('confirmNote').value = tx.note || '';
   const d = new Date(tx.date + 'T00:00:00');
-  document.getElementById('confirmDate').textContent = d.toLocaleDateString('es', { day:'numeric', month:'long' });
+  document.getElementById('confirmDate').textContent = d.toLocaleDateString('es-CO', { day:'numeric', month:'long' });
   renderCatSelector('confirmCatSelector', 'confirm');
   openModal('confirmModal');
 }
@@ -1124,7 +1122,7 @@ function simulateShortcut() {
   const merchant = (document.getElementById('testMerchant').value || '').trim();
   const amount = parseFloat(document.getElementById('testAmount').value);
   if (!merchant || !amount) { alert('Completa ambos campos'); return; }
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
   openConfirmModal({ merchant: merchant.toUpperCase(), amount, date: today, note: '' });
 }
 
@@ -1175,11 +1173,13 @@ function checkURLParams() {
   const p = new URLSearchParams(window.location.search);
   if (!p.get('add')) return;
   const merchant = (p.get('merchant') || '').toUpperCase().trim();
-  // Handles $1,000 / $100,000 / $1,000,000 (comma as thousands separator)
-  const rawAmount = (p.get('amount') || '0')
-    .replace(/[^\d]/g, '');     // strip everything except digits → "1000000"
+  // Handles: $1,000 / $100,000 / $1,000,000 / 100000 / 1.000.000
+  const rawAmount = (p.get('amount') || '')
+    .replace(/[$\s]/g, '')      // remove $ and spaces
+    .replace(/,/g, '')           // remove commas (thousands separator)
+    .replace(/\./g, '');         // remove dots (thousands separator)
   const amount = parseFloat(rawAmount) || 0;
-  const date = p.get('date') || new Date().toISOString().split('T')[0];
+  const date = p.get('date') || new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
   const note = p.get('note') || '';
   // Show popup even if amount is 0 so user can correct it
   setTimeout(() => openConfirmModal({ merchant: '', amount, date, note }), 600);
