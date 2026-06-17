@@ -975,18 +975,43 @@ function saveAdd() {
 
 function renderList() {
   const txs = txForMonth();
-  const total = txs.reduce((s, t) => s + t.amount, 0);
+  const totals = catTotals(txs);
+
+  const entrada = (totals['salario'] || 0) + (totals['ingresos_extra'] || 0);
+  const salida  = CATEGORIES.filter(c => c.type === 'gasto').reduce((s,c) => s + totals[c.id], 0)
+                + (totals['ahorros'] || 0) + (totals['inversion'] || 0);
 
   document.getElementById('page-list').innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <span style="font-size:13px;color:var(--muted)">${txs.length} transacciones</span>
-      <span style="font-weight:700">${fmt(total)}</span>
+    <!-- ENTRADA / SALIDA -->
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+      <div class="summary-card ingresos" style="border-radius:var(--radius);padding:16px 18px">
+        <div class="s-label">🟢 DINERO DE ENTRADA</div>
+        <div class="s-amount" style="font-size:26px">${fmt(entrada)}</div>
+        <div style="display:flex;gap:14px;margin-top:6px">
+          <div style="font-size:12px;opacity:.85">💼 Salario &nbsp;<b>${fmt(totals['salario']||0)}</b></div>
+          <div style="font-size:12px;opacity:.85">⭐ Extras &nbsp;<b>${fmt(totals['ingresos_extra']||0)}</b></div>
+        </div>
+      </div>
+      <div class="summary-card gastos" style="border-radius:var(--radius);padding:16px 18px">
+        <div class="s-label">🔴 DINERO DE SALIDA</div>
+        <div class="s-amount" style="font-size:26px">${fmt(salida)}</div>
+        <div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">
+          <div style="font-size:12px;opacity:.85">💸 Gastos &nbsp;<b>${fmt(CATEGORIES.filter(c=>c.type==='gasto').reduce((s,c)=>s+totals[c.id],0))}</b></div>
+          <div style="font-size:12px;opacity:.85">💰 Ahorros &nbsp;<b>${fmt(totals['ahorros']||0)}</b></div>
+          <div style="font-size:12px;opacity:.85">📈 Inversión &nbsp;<b>${fmt(totals['inversion']||0)}</b></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRANSACCIONES -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span class="section-title" style="margin-bottom:0">${txs.length} transacciones</span>
+      <button class="btn btn-outline" style="width:auto;padding:6px 14px;font-size:12px" onclick="exportCSV()">📥 CSV</button>
     </div>
     ${txs.length ? `
       <div class="card" style="padding:0 16px">
         ${txs.map(t => txHTML(t)).join('')}
       </div>
-      <button class="btn btn-outline" style="margin-top:8px" onclick="exportCSV()">📥 Exportar CSV</button>
     ` : `<div class="empty"><div class="empty-icon">📭</div><p>Sin transacciones este mes.</p></div>`}
   `;
 
